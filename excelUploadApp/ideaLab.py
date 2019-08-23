@@ -1,12 +1,16 @@
 from recordObj import recordObj
 
 def main():
-    r = recordObj('Sheet1', 'Item', 12, 1)
-    # rows = []
-    rows = [r]
-    for r in rows:
-        print(r.sheet_name)
-        print(r.column_name)
+    if not retCode(2):
+        print('failed')
+    else:
+        print('Success')
 
+
+def retCode(val):
+    if val == 1:
+        return False
+    else:
+        return True
 if __name__ == '__main__':
     main()
