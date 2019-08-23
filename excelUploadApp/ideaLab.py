@@ -1,4 +1,5 @@
 from recordObj import recordObj
+from datetime import datetime
 
 def main():
     if not retCode(2):
@@ -14,3 +15,4 @@ def retCode(val):
         return True
 if __name__ == '__main__':
     main()
+    print(datetime.now().strftime('%Y%m%d%H%M%S'))
