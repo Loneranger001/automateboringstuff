@@ -1,24 +1,12 @@
 import csv
 import os
 from openpyxl import load_workbook
-from recordObj import recordObj
 from configparser import ConfigParser
-import logging
-from datetime import datetime
+
 
 """
 This class will handle the task of parsing excel file and writing csv file.
 """
-
-# basis settings for logging
-logfile = "excel_parser_{0}".format(datetime.now().strftime('%Y%m%d%H%M%S'))
-logging.basicConfig(
-    filename="excel_parser.log",
-    level=logging.DEBUG,
-    filemode="w",
-    format="Name: %(user_name)s : %(asctime)s: %(filename)s: %(levelname)s: %(funcName)s Line: %(lineno)d - %(message)s",
-    datefmt="%m/%d/%Y %I:%M:%S %p"
-)
 
 
 class CsvFileCreator:
@@ -57,14 +45,14 @@ class CsvFileCreator:
         except Exception as ex:
             pass
 
-    def write_csv(self, file_name, input_data):
+    def write_csv(self, file_name, input_data, delimiter):
         try:
             file_path = os.path.dirname(self.excel_path)
             full_path = os.path.join(file_path, file_name)
             print(full_path)
             # open the file for writing
             with open(full_path, newline='', mode='w') as File:
-                writer = csv.writer(File)
+                writer = csv.writer(File, delimiter=delimiter)
                 writer.writerows(input_data)
             return True
         except Exception as ex:
