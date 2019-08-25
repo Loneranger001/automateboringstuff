@@ -92,7 +92,7 @@ def main():
     app_config = app_settings('Coreappsetting')
     app = QApplication(sys.argv)
     app.setApplicationName('Excel Converter/Uploader')
-    app.setStyle('Windows')
+    app.setStyle('Fusion')
     window = MainWindow(app_config)
     window.show()
     sys.exit(app.exec_())
