@@ -20,9 +20,16 @@ class CsvFileCreator:
         options = self.config.options(section)
         for option in options:
             try:
-                dict1[option] = self.config.get(section, option)
-                if dict1[option] == -1:
-                    logging.warning(f'skip option %s' % option)
+                if option == 'delimiter':
+                    dict1[option] = self.config.get(section, option)
+                elif option == 'enableexcel':
+                    dict1[option] = self.config.getboolean(section, option)
+                elif option == 'enablecsv':
+                    dict1[option] = self.config.getboolean(section, option)
+                elif option == 'columns':
+                    dict1[option] = self.config.get(section, option)
+                elif dict1[option] == -1:
+                    pass
             except:
                 print("exception on %s" % option)
                 dict1[option] = None
@@ -34,7 +41,7 @@ class CsvFileCreator:
             wb = load_workbook(self.excel_path)
             rangeData = []
             for ws in wb:
-                for rows in ws.iter_rows(ws.min_row, ws.max_row, ws.min_column, ws.max_column):
+                for rows in ws.iter_rows(ws.min_row+1, ws.max_row, ws.min_column, ws.max_column):
                     rowData = []
                     for row in rows:
                         rowData.append(row.value)
@@ -45,7 +52,7 @@ class CsvFileCreator:
         except Exception as ex:
             pass
 
-    def write_csv(self, file_name, input_data, delimiter):
+    def write_csv(self, file_name, input_data, delimiter, header):
         try:
             file_path = os.path.dirname(self.excel_path)
             full_path = os.path.join(file_path, file_name)
@@ -53,6 +60,10 @@ class CsvFileCreator:
             # open the file for writing
             with open(full_path, newline='', mode='w') as File:
                 writer = csv.writer(File, delimiter=delimiter)
+                # write the header first.
+                if header:
+                    header = header.upper()
+                    writer.writerow([header])
                 writer.writerows(input_data)
             return True
         except Exception as ex:
