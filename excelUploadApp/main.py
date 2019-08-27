@@ -69,7 +69,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 QMessageBox.information(self, 'Information', 'File successfully generated.', QMessageBox.Ok,
                                         QMessageBox.Ok)
         except Exception as e:
-            QMessageBox.Critical(self, 'Exception!', str(e), QMessageBox.Ok,
+            QMessageBox.critical(self, 'Exception!', str(e), QMessageBox.Ok,
                                  QMessageBox.Ok)
 
 
