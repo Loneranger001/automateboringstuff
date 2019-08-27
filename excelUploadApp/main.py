@@ -57,6 +57,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def process_file(self):
         try:
+            # need to handle logic csv or excel
+
             # instantiate the class
             excel_obj = CsvFileCreator(self.file)
             parsed_data = excel_obj.parse_excel()
