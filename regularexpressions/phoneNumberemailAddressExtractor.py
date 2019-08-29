@@ -10,20 +10,37 @@ import re
 # )''', re.VERBOSE)
 phoneNumRegex = re.compile(r'''
 (
-  (\d{3})
-  (-?)
-  (\d{3})
-  (-)?
-  (\d{4})
+  \d{3} #
+   -?   # optional dash
+  \d{3}
+  -?    # optional dash
+  \d{4}
 )
 ''', re.VERBOSE)
 
-matches = phoneNumRegex.search('My numbers 7003305607 or 700-330-5607')
+# matches = phoneNumRegex.findall('My numbers 7003305607 or 700-330-5607')
+# print(matches)
+
+emailRegex = re.compile(r'''(
+[A-Za-z0-9._%+-]+   # username
+@                   #
+[a-zA-Z0-9._]+      # domain name
+(\.[A-Za-z]{2,4})   # dot-something
+)
+''', re.VERBOSE)
+
+
+matches = emailRegex.findall('my 2 email addresses are asfko155l@gmail.com or onetechgeek88@gmail.com')
 print(matches)
 
-# # 345/(456)
-# 7003305607
-# 07003305607
-# +91 7003305607
 
-
+# matches = []
+# # Find matches in the clipBoard, paste the clipBoard content onto a variable.
+# text = str(pyperclip.paste())
+#
+# for nums in phoneNumRegex.findall(text):
+#     matches.append(nums)
+# for email in emailRegex.findall(text):
+#     matches.append(email)
+#
+# print(matches)
