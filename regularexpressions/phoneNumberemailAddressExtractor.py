@@ -28,19 +28,20 @@ emailRegex = re.compile(r'''(
 (\.[A-Za-z]{2,4})   # dot-something
 )
 ''', re.VERBOSE)
-
-
-matches = emailRegex.findall('my 2 email addresses are asfko155l@gmail.com or onetechgeek88@gmail.com')
-print(matches)
-
-
-# matches = []
-# # Find matches in the clipBoard, paste the clipBoard content onto a variable.
-# text = str(pyperclip.paste())
 #
-# for nums in phoneNumRegex.findall(text):
-#     matches.append(nums)
-# for email in emailRegex.findall(text):
-#     matches.append(email)
 #
+# matches = emailRegex.findall('My numbers 7003305607 or 700-330-5607, my 2 email addresses are asfko155l@gmail.com or onetechgeek88@gmail.com')
 # print(matches)
+
+
+matches = []
+# Find matches in the clipBoard, paste the clipBoard content onto a variable.
+text = str(pyperclip.paste())
+#
+for nums in phoneNumRegex.findall(text):
+    matches.append(nums)
+# print(matches)
+for text in emailRegex.findall(text):
+    matches.append(text[0])
+#
+print(matches)
