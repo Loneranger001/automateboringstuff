@@ -13,7 +13,7 @@ logFile = '_'.join([baseName.lower(), tday])
 # print(logFile)
 
 logging.basicConfig(
-    filename=logFile,
+    filename='.'.join([logFile, 'log']),
     level=logging.DEBUG,
     filemode='w',
     format='%(asctime)s: %(filename)s: %(levelname)s: %(funcName)s: Line %(lineno)d - %(message)s',
