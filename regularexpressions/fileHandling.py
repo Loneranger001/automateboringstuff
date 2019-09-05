@@ -24,18 +24,33 @@ print(os.path.abspath(os.curdir))
 # os.makedirs('.\\dir1\\dir2')
 try:
     # os.rmdir('.\\dir1')
-    os.rmdir('.\\dummy')
+    # os.rmdir('.\\files')
+    None
 except FileNotFoundError as e:
     print(e)
 
 
-if os.path.exists('dummy'):
+if os.path.exists('files'):
     print('Directory Exists!')
 else:
-    os.makedirs('dummy')
+    os.makedirs('files')
     print('Directory Created')
 
 # list of files and sizes
 for file in os.listdir():
     print('Size of the File <%s> is %f KB' % (file, os.path.getsize(file)/1024))
+    if os.path.getsize(file) == 0:
+        print('Zero Byte File '+file)
 
+# check if a path exists
+if os.path.exists('identifyFileWithPattern.py'):
+    if os.path.isdir('identifyFileWithPattern.py'):
+        print('This is a directory.')
+    else:
+        print('This is a file')
+
+print(os.path.exists('D:\\'))
+print(os.getcwd())
+os.chdir('files')
+print(os.getcwd())
+# open file.
