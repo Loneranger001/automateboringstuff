@@ -8,8 +8,8 @@ class InvalidDataFormat(Exception):
 
 
 class FileHandling:
-    def __init__(self, input_file):
-        self.input_file = input_file
+    def __init__(self, inputfile):
+        self.input_file = inputfile
 
     def readFile(self):
         lineNum = 1
@@ -41,12 +41,24 @@ class FileHandling:
         else:
             raise FileExistsError('%s Could Not Be Found In The Directory %s' % (self.input_file, os.getcwd()))
 
+    def writeFile(self, str_content, mode='append'):
+        # Open the file
+        if mode == 'append':
+            fileObject = open(self.input_file, 'a')
+        else:
+            fileObject = open(self.input_file, 'w')
+
+        fileObject.write(str_content)
+
 
 if __name__ == '__main__':
 
     input_file = sys.argv[1]
+    rej_file = sys.argv[2]
     print(input_file)
-    #Instantiate
+    # Instantiate
     fileObj = FileHandling(input_file)
     fileObj.readFile()
+    s = 'FHEAD%010s%010s-%10s'
+    fileObj.writeFile(s % (12, 12, 13))
 

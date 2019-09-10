@@ -1,4 +1,6 @@
 import os
+import sys
+import getpass
 
 # join command
 myFiles=['accounts.txt', 'details.csv', 'invite.docx']
@@ -54,3 +56,5 @@ print(os.getcwd())
 os.chdir('files')
 print(os.getcwd())
 # open file.
+print(os.path.splitext(os.path.basename(sys.argv[0]))[0])
+print(getpass.getuser())
