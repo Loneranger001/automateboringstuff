@@ -2,6 +2,8 @@ import os
 import sys
 import getpass
 import cx_Oracle
+import subprocess
+import re
 from configparser import ConfigParser
 from datetime import datetime
 import logging
@@ -72,7 +74,7 @@ def init():
             filename=logfile,
             filemode='w',
             level=logging.DEBUG,
-            format="%(asctime)s: %(filename)s: %(levelname)s: %(funcName)s: line: %(lineno)d: -%(message)s"
+            format="%(asctime)s: %(filename)s: %(levelname)s: %(funcName)s: line: %(lineno)d: %(message)s"
         )
 
         # read configuration file
@@ -90,7 +92,6 @@ def init():
         return 0
 
 
-
 def check_files(file):
     file_cnt = 0
 
@@ -98,12 +99,12 @@ def check_files(file):
     if os.path.getsize(file) > 0:
         logging.info('Data file %s found: proceeding.' % file)
         file_cnt += 1
-        return 0
+        return True
     else:
         logging.info('Error: No data available in the file %s.' % file)
         logging.info('Moving the file %s to rejected file dir %s.' % (file, rejpath))
-        os.rename(file, os.path.join(rejpath, file))
-        return 3
+        # os.rename(file, os.path.join(rejpath, file))
+        return False
 
 
 def execute_sql(conn, command):
@@ -111,7 +112,7 @@ def execute_sql(conn, command):
         cur = conn.cursor()
         # cur.prepare(sql)
         cur.execute(command)
-    except Exception:
+    except:
         logging.critical('Sql Statement Failed', exc_info=True)
         return 1
     else:
@@ -121,7 +122,7 @@ def execute_sql(conn, command):
 
 def logon():
     try:
-        db_conn=cx_Oracle.connect(connectionString)
+        db_conn = cx_Oracle.connect(connectionString)
     except:
         logging.critical('Unable to make a database connection', exc_info=True)
         return 1
@@ -130,6 +131,28 @@ def logon():
         return db_conn
 
 
+def load_stage():
+    subprocess.call(['ls', '-la'], stdout=subprocess.PIPE)
+
+
 if __name__ == '__main__':
+
     init()
-    logon()
+    # logon()
+    # get the lsit of valid files to process
+    fileFormat = re.compile(r'ascena_(.)*_mass_tsf_req(.)*.csv')
+    fileList = [file for file in os.listdir() if fileFormat.search(file)]
+    if not fileList:
+        logging.warning('No File Found To Process.Program will now exit.')
+        exit(0)
+    else:
+        logging.info('%d files found. Processing ...' % len(fileList))
+        logging.info('Validating Individual Files.')
+        # Loop through files
+        for file in fileList:
+            if check_files(file):
+                # load_stage()
+                pass
+
+    # load_stage()
+
