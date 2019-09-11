@@ -84,6 +84,22 @@ def init():
         for option in options:
             connectionString = config.get('appSettings', option)
 
+        params = {}
+        params['scriptName'] = scriptName
+        params['user'] = user
+        params['logpath'] = logpath
+        params['arcpath'] = arcpath
+        print(params)
+
+        envsetting = """
+        ****************************************************************************
+            script name = %{scriptName}
+            user        = %{user}
+            logpath     = %{logpath}
+            arcpath     = %{arcpath}
+        *****************************************************************************
+            """
+        logging.info(envsetting % params)
     except:
         logging.critical('Encountered error while setting the initial variables.', exc_info=True)
         return 1
