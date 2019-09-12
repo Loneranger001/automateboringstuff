@@ -93,13 +93,13 @@ def init():
 
         envsetting = """
         ****************************************************************************
-            script name = %{scriptName}
-            user        = %{user}
-            logpath     = %{logpath}
-            arcpath     = %{arcpath}
+            script name = {scriptName}
+            user        = {user}
+            logpath     = {logpath}
+            arcpath     = {arcpath}
         *****************************************************************************
-            """
-        logging.info(envsetting % params)
+            """.format(**params)
+        logging.info(envsetting)
     except:
         logging.critical('Encountered error while setting the initial variables.', exc_info=True)
         return 1
