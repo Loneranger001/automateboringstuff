@@ -1,6 +1,7 @@
 import os
+import cx_Oracle
 
-home_dir = 'C:\\Users\\alaskar\\Documents\\Project Ascena\\'
+home_dir = r'C:\Users\alaskar\Documents\Project Ascena\'
 
 
 def move_files():
@@ -23,19 +24,23 @@ def create_folders():
         # os.mkdir('\\photos\\sequels')
     else:
         # empty the contents
-        # for root, dirs, files in os.walk(".", topdown=False):
-        #     for file in files:
-        #         # os.remove(os.path.join(root, file))
-        #         print(os.path.join(root, file))
-        #     for name in dirs:
-        #         print(os.path.join(root, name))
+
+        for root, dirs, files in os.walk('photos', topdown=False):
+            # for file in files:
+            #     # os.remove(os.path.join(root, file))
+            #     print(os.path.join(root, file))
+            for name in dirs:
+                print(os.path.join(root, name))
         pass
 
 
 def compress_files():
     pass
 
+# def db_connect():
+#     return cx_Oracle.connect(dsn='RMSCECA1')
 
 if __name__ == '__main__':
-    create_folders()
-    move_files()
+    # create_folders()
+    # move_files()
+    db_connect()
