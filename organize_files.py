@@ -1,11 +1,29 @@
 import os
 import cx_Oracle
+import shutil
 
-home_dir = r'C:\Users\alaskar\Documents\Project Ascena\'
+# home_dir = 'C:\\Users\\alaskar\\Documents\Project Ascena\'
+home_dir = os.path.join('C:\\', 'Users', 'alaskar', 'Documents', 'Project Ascena')
+print(home_dir)
+defined_dirs = ('family', 'seashell', 'sequels')
 
 
 def move_files():
-    pass
+    # Get all files inside code repositoty
+    # files = next(os.walk(os.path.join(home_dir, 'code repository')))[2]
+    # print(files)
+    # for root, dirs, files in os.walk("code repository"):
+    #     print(root)
+    #     for dir in dirs:
+    #         print(dir)
+    path = os.path.join(home_dir, 'code repository', 'LBCA')
+    for file in os.listdir(path):
+        # print(os.path.join(home_dir, 'code repository', 'LBCA'))
+        # print(os.path.abspath(file))
+        isFile = os.path.isfile(os.path.join(path, file))
+        if isFile:
+            print(file)
+            # shutil.
 
 
 def create_folders():
@@ -24,14 +42,35 @@ def create_folders():
         # os.mkdir('\\photos\\sequels')
     else:
         # empty the contents
+        root = next(os.walk('photos'))[0]
+        dirs = next(os.walk('photos'))[1]
+        files = next(os.walk('photos'))[2]
+        print(root)
+        print(dirs)
+        print(files)
 
-        for root, dirs, files in os.walk('photos', topdown=False):
-            # for file in files:
-            #     # os.remove(os.path.join(root, file))
-            #     print(os.path.join(root, file))
-            for name in dirs:
-                print(os.path.join(root, name))
-        pass
+        # for root, dirs, files in os.walk('photos', topdown=False):
+        # for file in files:
+        #     # os.remove(os.path.join(root, file))
+        #
+        # print(root)
+        # If a directory does not exist, create it else empty it
+        # if os.path.exists()
+        # for dir_name in dirs:
+        #     # os.rmdir(os.path.join(root, dir_name)
+        #     abs_path = os.path.join(root, dir_name)
+        for d in defined_dirs:
+            try:
+                indx = dirs.index(d)
+                abs_path = os.path.join(root, d)
+                print(abs_path)
+                # If found, then empty it
+                if indx >= 0:
+                    for file in os.listdir(abs_path):
+                        # Empty the folders
+                        os.remove(os.path.join(abs_path, file))
+            except ValueError:
+                os.mkdir(os.path.join(root, d))
 
 
 def compress_files():
@@ -40,7 +79,10 @@ def compress_files():
 # def db_connect():
 #     return cx_Oracle.connect(dsn='RMSCECA1')
 
+
 if __name__ == '__main__':
-    # create_folders()
-    # move_files()
-    db_connect()
+    create_folders()
+    move_files()
+    # db_connect()
+
+
