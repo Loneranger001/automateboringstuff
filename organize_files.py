@@ -32,6 +32,38 @@ def move_files():
             elif ext == 'sh' or ext == 'ksh':
                 dest = os.path.join(home_dir, 'photos', 'seashell')
                 shutil.copy(os.path.join(path, file), os.path.join(dest, file))
+    path = os.path.join(home_dir, 'code repository', 'MAU')
+    for file in os.listdir(path):
+        # print(os.path.join(home_dir, 'code repository', 'LBCA'))
+        # print(os.path.abspath(file))
+        isFile = os.path.isfile(os.path.join(path, file))
+        if isFile:
+            ext = os.path.splitext(file)[1][1:]
+            if ext == 'sql':
+                dest = os.path.join(home_dir, 'photos', 'sequels')
+                shutil.copy(os.path.join(path, file), os.path.join(dest, file))
+            elif ext == 'pc':
+                dest = os.path.join(home_dir, 'photos', 'family')
+                shutil.copy(os.path.join(path, file), os.path.join(dest, file))
+            elif ext == 'sh' or ext == 'ksh':
+                dest = os.path.join(home_dir, 'photos', 'seashell')
+                shutil.copy(os.path.join(path, file), os.path.join(dest, file))
+    path = os.path.join(home_dir, 'code repository', 'DRS')
+    for file in os.listdir(path):
+        # print(os.path.join(home_dir, 'code repository', 'LBCA'))
+        # print(os.path.abspath(file))
+        isFile = os.path.isfile(os.path.join(path, file))
+        if isFile:
+            ext = os.path.splitext(file)[1][1:]
+            if ext == 'sql':
+                dest = os.path.join(home_dir, 'photos', 'sequels')
+                shutil.copy(os.path.join(path, file), os.path.join(dest, file))
+            elif ext == 'pc':
+                dest = os.path.join(home_dir, 'photos', 'family')
+                shutil.copy(os.path.join(path, file), os.path.join(dest, file))
+            elif ext == 'sh' or ext == 'ksh':
+                dest = os.path.join(home_dir, 'photos', 'seashell')
+                shutil.copy(os.path.join(path, file), os.path.join(dest, file))
 
 
 def create_folders():
