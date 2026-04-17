@@ -55,7 +55,7 @@ struct AccountImportReviewView: View {
         }
 
         do {
-            await SyncService.shared.sync(connection: connection, context: context)
+            try await SyncService.shared.sync(connection: connection, context: context)
             accounts = connection.accounts
         } catch {
             self.error = error.localizedDescription

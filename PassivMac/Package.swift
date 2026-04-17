@@ -8,7 +8,7 @@ let package = Package(
     ],
     dependencies: [
         // Keychain wrapper — simpler than raw SecItem calls
-        .package(url: "https://github.com/kishikawakatsuki/KeychainAccess.git", from: "4.2.0"),
+        .package(url: "https://github.com/kishikawakatsumi/KeychainAccess.git", from: "4.2.0"),
     ],
     targets: [
         .executableTarget(

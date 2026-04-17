@@ -98,7 +98,7 @@ struct TargetAllocationEditorView: View {
             Text("Total:")
             Text(FormatUtils.percent(totalPercent))
                 .fontWeight(.semibold)
-                .foregroundStyle(isValid ? .primary : .red)
+                .foregroundStyle(isValid ? AnyShapeStyle(.primary) : AnyShapeStyle(Color.red))
             if !isValid {
                 Text("(must equal 100%)")
                     .font(.caption)
@@ -128,7 +128,12 @@ struct AllocationRowView: View {
             HStack(spacing: 4) {
                 TextField("0", value: Binding(
                     get: { allocation.targetPercent * 100 },
-                    set: { allocation.targetPercent = $0 / 100 }
+                    set: { newValue in
+                        // Clamp to [0, 100] and reject NaN/Infinity; otherwise a user could
+                        // type -5 or 1e308 and poison the rebalance engine's math.
+                        let sanitized = newValue.isFinite ? min(max(newValue, 0), 100) : 0
+                        allocation.targetPercent = sanitized / 100
+                    }
                 ), format: .number.precision(.fractionLength(1)))
                 .multilineTextAlignment(.trailing)
                 .frame(width: 56)

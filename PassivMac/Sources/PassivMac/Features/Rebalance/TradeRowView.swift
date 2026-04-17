@@ -9,7 +9,7 @@ struct TradeRowView: View {
         HStack(spacing: 12) {
             // Exclude toggle
             Image(systemName: isExcluded ? "circle" : "checkmark.circle.fill")
-                .foregroundStyle(isExcluded ? .secondary : .blue)
+                .foregroundStyle(isExcluded ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.blue))
                 .font(.title3)
                 .onTapGesture { onToggle() }
 

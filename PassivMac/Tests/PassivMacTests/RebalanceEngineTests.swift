@@ -77,8 +77,9 @@ final class RebalanceEngineTests: XCTestCase {
 
     func testBuyFitsWithinCashWithoutScaling() {
         // $750 cash, 50/50 VFV+XAW at $100 each.
-        // totalPortfolioValue = $750, target = $375 each → floor(375/100) = 3 shares each = $300 each = $600 total.
-        // $600 < $750 → scaling does NOT trigger; all shares purchased.
+        // totalPortfolioValue = $750, target = $375 each → floor(375/100) = 3 shares each = $300 each.
+        // Raw buys: 3+3 shares = $600. Leftover cash $150 → distribute one extra share to
+        // the cheapest under-target buy (tie; first entry wins = VFV). Final: VFV 4, XAW 3.
         let input = makeInput(
             cash: 750,
             prices: [vfvId: 100, xawId: 100],
@@ -86,10 +87,11 @@ final class RebalanceEngineTests: XCTestCase {
         )
         let trades = RebalanceEngine.calculate(input)
         XCTAssertEqual(trades.count, 2)
-        XCTAssertEqual(trades.first(where: { $0.symbol == "VFV" })?.quantity, 3)
-        XCTAssertEqual(trades.first(where: { $0.symbol == "XAW" })?.quantity, 3)
+        let totalShares = trades.reduce(0) { $0 + $1.quantity }
+        XCTAssertEqual(totalShares, 7, "Leftover cash after rounding should have bought one more share")
         let totalCost = trades.reduce(0) { $0 + $1.estimatedCost }
         XCTAssertLessThanOrEqual(totalCost, 750)
+        XCTAssertGreaterThan(totalCost, 600, "Rounding-remainder redistribution must purchase at least one more share")
     }
 
     func testScalesDownProportionallyWhenCashShort() {
@@ -210,6 +212,37 @@ final class RebalanceEngineTests: XCTestCase {
         )
         let trades = RebalanceEngine.calculate(input)
         XCTAssertEqual(trades.first?.quantity, 13)
+    }
+
+    func testZeroPricedSecurityIsSkipped() {
+        // Price of 0 would previously divide-by-zero. Now the security is dropped.
+        let input = makeInput(
+            cash: 10_000,
+            prices: [vfvId: 0, xawId: 100],
+            targetAllocations: [(vfvId, "VFV", 0.5), (xawId, "XAW", 0.5)]
+        )
+        let trades = RebalanceEngine.calculate(input)
+        XCTAssertNil(trades.first(where: { $0.symbol == "VFV" }))
+        XCTAssertNotNil(trades.first(where: { $0.symbol == "XAW" }))
+    }
+
+    func testNaNPriceIsSkipped() {
+        let input = makeInput(
+            cash: 10_000,
+            prices: [vfvId: .nan],
+            targetAllocations: [(vfvId, "VFV", 1.0)]
+        )
+        XCTAssertTrue(RebalanceEngine.calculate(input).isEmpty)
+    }
+
+    func testNegativeCashTreatedAsZero() {
+        let input = makeInput(
+            cash: -500,
+            prices: [vfvId: 100],
+            targetAllocations: [(vfvId, "VFV", 1.0)]
+        )
+        // Negative cash is noise; with no holdings the total portfolio is non-positive → no trades.
+        XCTAssertTrue(RebalanceEngine.calculate(input).isEmpty)
     }
 
     func testAlreadyBalancedPortfolio() {

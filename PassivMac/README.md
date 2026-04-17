@@ -186,7 +186,7 @@ PassivMac/
 
 | Package | Purpose |
 |---|---|
-| [KeychainAccess](https://github.com/kishikawakatsuki/KeychainAccess) | Keychain wrapper for OAuth token storage |
+| [KeychainAccess](https://github.com/kishikawakatsumi/KeychainAccess) | Keychain wrapper for OAuth token storage |
 
 All other functionality uses Apple frameworks: SwiftUI, SwiftData, Swift Charts, AuthenticationServices, UserNotifications, URLSession.
 
