@@ -111,8 +111,9 @@ struct SymbolSearchSheet: View {
     }
 
     private func upsertSecurity(_ result: SymbolSearchResult) -> Security {
+        let symbol = result.symbol
         let existing = try? context.fetch(
-            FetchDescriptor<Security>(predicate: #Predicate { $0.symbol == result.symbol })
+            FetchDescriptor<Security>(predicate: #Predicate { $0.symbol == symbol })
         ).first
         if let existing { return existing }
 

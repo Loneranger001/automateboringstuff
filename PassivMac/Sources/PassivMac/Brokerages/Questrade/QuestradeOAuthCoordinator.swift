@@ -32,7 +32,7 @@ final class QuestradeOAuthCoordinator: NSObject, ASWebAuthenticationPresentation
 
     /// Opens the Questrade login page and returns the authorization code on success.
     func authorize(clientId: String) async throws -> String {
-        let authURL = QuestradeEndpoints.authorizeURL(
+        let authURL = try QuestradeEndpoints.authorizeURL(
             clientId: clientId,
             redirectURI: Self.redirectURI
         )
@@ -68,6 +68,6 @@ final class QuestradeOAuthCoordinator: NSObject, ASWebAuthenticationPresentation
     /// Exchange the authorization code for access + refresh tokens.
     func exchangeCode(_ code: String, httpClient: HTTPClient) async throws -> QuestradeTokenResponse {
         let params = QuestradeEndpoints.tokenExchangeParams(code: code, redirectURI: Self.redirectURI)
-        return try await httpClient.postForm(QuestradeEndpoints.tokenURL(), formParams: params)
+        return try await httpClient.postForm(try QuestradeEndpoints.tokenURL(), formParams: params)
     }
 }

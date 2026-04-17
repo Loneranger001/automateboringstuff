@@ -36,8 +36,23 @@ final class SyncService {
                 try await sync(connection: connection, context: context)
             } catch {
                 lastError = error
+                // If the connection is irrecoverably broken (missing keychain token or
+                // refresh rejected), flag it inactive so the UI can prompt the user to
+                // reconnect rather than retrying forever.
+                if Self.isUnrecoverableAuthError(error) {
+                    connection.isActive = false
+                    try? context.save()
+                }
             }
         }
+    }
+
+    /// True if the error indicates the user must re-authenticate the brokerage.
+    /// Network/rate-limit errors are recoverable and NOT included.
+    private static func isUnrecoverableAuthError(_ error: Error) -> Bool {
+        if case APIError.authExpired = error { return true }
+        if error is KeychainError { return true }
+        return false
     }
 
     /// Sync a single BrokerageConnection: refresh tokens, fetch accounts, positions, balances.

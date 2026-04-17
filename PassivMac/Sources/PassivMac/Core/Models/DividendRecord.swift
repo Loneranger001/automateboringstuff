@@ -11,7 +11,7 @@ final class DividendRecord {
     var amount: Double
     var currencyRaw: String
     var paidAt: Date
-    var description: String
+    var note: String
 
     init(
         id: UUID = UUID(),
@@ -21,7 +21,7 @@ final class DividendRecord {
         amount: Double,
         currency: Currency,
         paidAt: Date,
-        description: String = ""
+        note: String = ""
     ) {
         self.id = id
         self.account = account
@@ -30,7 +30,7 @@ final class DividendRecord {
         self.amount = amount
         self.currencyRaw = currency.rawValue
         self.paidAt = paidAt
-        self.description = description
+        self.note = note
     }
 
     var currency: Currency {

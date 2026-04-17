@@ -21,7 +21,7 @@ enum FormatUtils {
         case 1_000...:
             return "\(sign)\(currency.symbol)\(String(format: "%.1fK", abs / 1_000))"
         default:
-            return currency(value, currency: currency)
+            return FormatUtils.currency(value, currency: currency)
         }
     }
 

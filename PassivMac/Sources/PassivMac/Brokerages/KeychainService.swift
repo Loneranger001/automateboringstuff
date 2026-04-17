@@ -24,8 +24,12 @@ actor KeychainService {
 
     static let shared = KeychainService()
 
+    // `.whenUnlockedThisDeviceOnly` — tokens are only readable while the device is
+    // actively unlocked, never written off-device (no iCloud sync) and never available
+    // while the screen is locked. Safer than `afterFirstUnlock` for financial creds.
     private let keychain = Keychain(service: "com.passivmac.tokens")
-        .accessibility(.afterFirstUnlockThisDeviceOnly)
+        .accessibility(.whenUnlockedThisDeviceOnly)
+        .synchronizable(false)
 
     private init() {}
 
