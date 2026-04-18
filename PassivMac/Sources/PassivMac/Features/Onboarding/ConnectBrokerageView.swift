@@ -13,6 +13,12 @@ struct ConnectBrokerageView: View {
     @State private var showImport = false
     @State private var newConnectionId: UUID?
 
+    // Manual paste OAuth state
+    @State private var showPasteSheet = false
+    @State private var pastedURL = ""
+    @State private var expectedState: String?
+    @State private var coordinator: QuestradeOAuthCoordinator?
+
     var body: some View {
         NavigationStack {
             Form {
@@ -36,7 +42,7 @@ struct ConnectBrokerageView: View {
                 Section {
                     TextField("Client ID", text: $clientId)
                         .textContentType(.none)
-                    Text("Register a personal app at questrade.com/api/home to get your Client ID. Set Callback URL to: http://127.0.0.1:53682/oauth/questrade")
+                    Text("Register a personal app at questrade.com/api/home to get your Client ID. Set Callback URL to: https://localhost/oauth/questrade")
                         .textSelection(.enabled)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -72,7 +78,7 @@ struct ConnectBrokerageView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Connect") {
-                        Task { await connectQuestrade() }
+                        beginQuestradeConnect()
                     }
                     .disabled(clientId.trimmingCharacters(in: .whitespaces).isEmpty || isConnecting)
                 }
@@ -94,17 +100,49 @@ struct ConnectBrokerageView: View {
                 }
             }
         }
+        .sheet(isPresented: $showPasteSheet) {
+            PasteRedirectURLSheet(
+                pastedURL: $pastedURL,
+                onCancel: {
+                    showPasteSheet = false
+                    coordinator = nil
+                    expectedState = nil
+                },
+                onSubmit: {
+                    Task { await completeQuestradeWithPastedURL() }
+                }
+            )
+        }
     }
 
-    private func connectQuestrade() async {
+    /// Step 1: open Questrade auth page in the browser, then show the paste sheet.
+    private func beginQuestradeConnect() {
+        error = nil
+        let c = QuestradeOAuthCoordinator()
+        do {
+            let state = try c.beginAuthorization(clientId: clientId.trimmingCharacters(in: .whitespaces))
+            coordinator = c
+            expectedState = state
+            pastedURL = ""
+            showPasteSheet = true
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    /// Step 2: user pasted the redirected URL. Extract the code and finish the flow.
+    private func completeQuestradeWithPastedURL() async {
+        guard let coordinator, let expectedState else { return }
         isConnecting = true
+        showPasteSheet = false
         error = nil
         let id = UUID()
 
         do {
-            let coordinator = await QuestradeOAuthCoordinator()
-            let code = try await coordinator.authorize(clientId: clientId.trimmingCharacters(in: .whitespaces))
-
+            let code = try coordinator.extractCode(
+                fromPastedURL: pastedURL,
+                expectedState: expectedState
+            )
             let http = HTTPClient()
             let tokenResponse = try await coordinator.exchangeCode(code, httpClient: http)
 
@@ -116,7 +154,6 @@ struct ConnectBrokerageView: View {
             connection.apiServer = tokenResponse.apiServer
             connection.tokenExpiresAt = Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn))
 
-            // Cache the apiServer for QuestradeProvider
             UserDefaults.standard.set(tokenResponse.apiServer, forKey: "qs_apiServer_\(id.uuidString)")
 
             context.insert(connection)
@@ -126,7 +163,52 @@ struct ConnectBrokerageView: View {
             showImport = true
         } catch {
             self.error = error.localizedDescription
+            // Re-open paste sheet so user can correct the URL without restarting the whole flow.
+            showPasteSheet = true
         }
         isConnecting = false
+        self.coordinator = nil
+        self.expectedState = nil
+    }
+}
+
+// MARK: - Paste Redirect URL Sheet
+
+private struct PasteRedirectURLSheet: View {
+    @Binding var pastedURL: String
+    var onCancel: () -> Void
+    var onSubmit: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Paste the redirect URL")
+                .font(.title3.bold())
+
+            Text("""
+            1. Sign in at the Questrade page that opened in your browser and approve the app.
+            2. Your browser will show a blank page or "Can't reach this site" at `localhost` — that's expected.
+            3. Copy the **entire URL** from the browser's address bar (it starts with `https://localhost/oauth/questrade?code=…`) and paste it below.
+            """)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            TextEditor(text: $pastedURL)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 80)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel, action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("Continue", action: onSubmit)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(pastedURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 520, idealWidth: 580, minHeight: 320)
     }
 }
