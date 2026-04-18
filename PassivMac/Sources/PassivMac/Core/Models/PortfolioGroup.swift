@@ -16,7 +16,10 @@ final class PortfolioGroup {
     var accounts: [Account]
     @Relationship(deleteRule: .cascade, inverse: \TargetAllocation.portfolioGroup)
     var targetAllocations: [TargetAllocation]
-    @Relationship(deleteRule: .cascade, inverse: \PortfolioSnapshot.portfolioGroupId)
+    // PortfolioSnapshot stores a plain `portfolioGroupId: UUID` (not a model reference),
+    // so there's no inverse to wire up here. Snapshots are managed explicitly in code;
+    // cascade delete is handled by filtering on portfolioGroupId if the group is removed.
+    @Relationship(deleteRule: .cascade)
     var snapshots: [PortfolioSnapshot]
 
     init(id: UUID = UUID(), name: String, baseCurrency: Currency = .cad) {
