@@ -39,6 +39,7 @@ struct ConnectBrokerageView: View {
                     Text("Register a personal app at questrade.com/api/home to get your Client ID. Use redirect URI: passivapp://oauth/questrade")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 } header: {
                     Text("Questrade API Credentials")
                 } footer: {
@@ -83,7 +84,7 @@ struct ConnectBrokerageView: View {
                 }
             }
         }
-        .frame(minWidth: 480, minHeight: 360)
+        .frame(minWidth: 560, idealWidth: 620, minHeight: 480, idealHeight: 540)
         .sheet(isPresented: $showImport) {
             if let id = newConnectionId {
                 AccountImportReviewView(connectionId: id) {
