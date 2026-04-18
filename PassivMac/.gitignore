@@ -1,2 +1,5 @@
 build/
 .build/
+
+*.profraw
+Package.resolved
