@@ -1,68 +1,47 @@
 import Foundation
-import AuthenticationServices
+import AppKit
 
-/// Handles the Questrade OAuth 2.0 Authorization Code flow using ASWebAuthenticationSession.
+/// Handles the Questrade OAuth 2.0 Authorization Code flow using a loopback
+/// HTTP redirect (`http://127.0.0.1:<port>/oauth/questrade`).
 ///
-/// Setup required:
-///   1. Register an app at https://www.questrade.com/api/home to get a clientId.
-///   2. Set redirect URI to "passivapp://oauth/questrade" in the Questrade developer portal.
-///   3. Add CFBundleURLTypes entry for scheme "passivapp" in Info.plist (or Package manifest).
+/// Questrade's developer portal doesn't allow custom URL schemes for callbacks,
+/// only http/https — so we can't use ASWebAuthenticationSession + a
+/// `passivapp://` scheme. Instead we:
+///   1. Spin up `LoopbackOAuthReceiver` on 127.0.0.1.
+///   2. Open the Questrade authorize URL in the user's default browser.
+///   3. After login, Questrade redirects the browser to the loopback URL;
+///      the receiver grabs the `code` and shuts down.
+///
+/// Setup required at https://www.questrade.com/api/home:
+///   Callback URL: http://127.0.0.1:53682/oauth/questrade
 @MainActor
-final class QuestradeOAuthCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
+final class QuestradeOAuthCoordinator {
 
-    static let redirectURI = "passivapp://oauth/questrade"
-    static let callbackScheme = "passivapp"
+    static var redirectURI: String { LoopbackOAuthReceiver.callbackURL }
 
-    private weak var presentationAnchor: NSWindow?
-
-    init(presentationAnchor: NSWindow? = nil) {
-        self.presentationAnchor = presentationAnchor
-    }
-
-    // MARK: - ASWebAuthenticationPresentationContextProviding
-
-    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        // Safe to call on main thread — ASWebAuthenticationSession always calls this on main
-        DispatchQueue.main.sync {
-            self.presentationAnchor ?? NSApp.keyWindow ?? NSWindow()
-        }
-    }
-
-    // MARK: - Public
-
-    /// Opens the Questrade login page and returns the authorization code on success.
+    /// Opens the Questrade login page in the default browser and returns the
+    /// authorization code once the browser redirects back to the loopback
+    /// listener.
     func authorize(clientId: String) async throws -> String {
+        // Random state — Questrade will echo it back in the redirect. We reject
+        // mismatches to prevent a malicious page from feeding us a foreign code.
+        let state = UUID().uuidString
+
         let authURL = try QuestradeEndpoints.authorizeURL(
             clientId: clientId,
-            redirectURI: Self.redirectURI
+            redirectURI: Self.redirectURI,
+            state: state
         )
 
-        return try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(
-                url: authURL,
-                callbackURLScheme: Self.callbackScheme
-            ) { callbackURL, error in
-                if let error {
-                    // User cancelled returns ASWebAuthenticationSessionError.canceledLogin
-                    continuation.resume(throwing: error)
-                    return
-                }
-                guard
-                    let callbackURL,
-                    let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
-                        .queryItems?
-                        .first(where: { $0.name == "code" })?
-                        .value
-                else {
-                    continuation.resume(throwing: APIError.authExpired)
-                    return
-                }
-                continuation.resume(returning: code)
-            }
-            session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = false
-            session.start()
-        }
+        let receiver = LoopbackOAuthReceiver()
+
+        // Start the listener *first* so we don't race the browser redirect.
+        async let code = receiver.waitForCode(expectedState: state)
+
+        // Open in default browser. NSWorkspace.open is fire-and-forget.
+        NSWorkspace.shared.open(authURL)
+
+        return try await code
     }
 
     /// Exchange the authorization code for access + refresh tokens.

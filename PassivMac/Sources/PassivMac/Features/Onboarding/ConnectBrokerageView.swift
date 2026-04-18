@@ -36,7 +36,8 @@ struct ConnectBrokerageView: View {
                 Section {
                     TextField("Client ID", text: $clientId)
                         .textContentType(.none)
-                    Text("Register a personal app at questrade.com/api/home to get your Client ID. Use redirect URI: passivapp://oauth/questrade")
+                    Text("Register a personal app at questrade.com/api/home to get your Client ID. Set Callback URL to: http://127.0.0.1:53682/oauth/questrade")
+                        .textSelection(.enabled)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
