@@ -23,12 +23,14 @@ enum QuestradeEndpoints {
         return url
     }
 
-    static func authorizeURL(clientId: String, redirectURI: String) throws -> URL {
-        try makeURL("\(authBaseURL)/oauth2/authorize", queryItems: [
+    static func authorizeURL(clientId: String, redirectURI: String, state: String? = nil) throws -> URL {
+        var items: [URLQueryItem] = [
             .init(name: "client_id", value: clientId),
             .init(name: "response_type", value: "code"),
             .init(name: "redirect_uri", value: redirectURI),
-        ])
+        ]
+        if let state { items.append(.init(name: "state", value: state)) }
+        return try makeURL("\(authBaseURL)/oauth2/authorize", queryItems: items)
     }
 
     static func tokenURL() throws -> URL {
