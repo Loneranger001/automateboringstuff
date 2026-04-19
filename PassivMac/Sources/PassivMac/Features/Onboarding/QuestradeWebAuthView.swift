@@ -69,18 +69,52 @@ struct QuestradeWebAuthView: NSViewRepresentable {
                 decisionHandler(.allow); return
             }
 
-            // Only short-circuit on the callback URL. Let the user navigate
-            // the Questrade login/approval pages freely up to that point.
-            guard url.absoluteString.hasPrefix(redirectPrefix) else {
+            // Match the callback by host suffix + path instead of a literal
+            // string prefix. Questrade occasionally normalizes `www.example.com`
+            // to `example.com` (or vice versa) in the redirect Location header,
+            // and we also don't want to rely on exact casing. Anything landing
+            // on example.com's /oauth/questrade path is unambiguously our
+            // callback — no other step of the auth flow lives on example.com.
+            let host = (url.host ?? "").lowercased()
+            let path = url.path
+            let isCallback = (host == "example.com" || host.hasSuffix(".example.com"))
+                && path.hasPrefix("/oauth/questrade")
+
+            guard isCallback else {
                 decisionHandler(.allow); return
             }
 
-            // From here on, cancel the load regardless of outcome — we never
-            // want the webview to actually hit the placeholder redirect host.
+            // Cancel the load — we never want the webview to actually hit
+            // example.com — then hand off to the shared finisher.
             decisionHandler(.cancel)
+            finish(with: url)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // Defense in depth: if decidePolicyFor missed the redirect for any
+            // reason (unusual server behavior, iframe shenanigans, whatever),
+            // check the final URL here too. Any URL carrying ?code=... &state=...
+            // on our callback path is the OAuth redirect, even if the page
+            // already rendered.
+            guard !didFinish, let url = webView.url else { return }
+            let host = (url.host ?? "").lowercased()
+            let path = url.path
+            let isCallback = (host == "example.com" || host.hasSuffix(".example.com"))
+                && path.hasPrefix("/oauth/questrade")
+            guard isCallback else { return }
+            finish(with: url)
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             guard !didFinish else { return }
             didFinish = true
+            onResult(.failure(error))
+        }
 
+        /// Shared exit path from either decidePolicyFor or didFinish.
+        fileprivate func finish(with url: URL) {
+            guard !didFinish else { return }
+            didFinish = true
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             if let err = items.first(where: { $0.name == "error" })?.value {
                 onResult(.failure(APIError.brokerageError("Questrade returned error: \(err)")))
@@ -98,12 +132,6 @@ struct QuestradeWebAuthView: NSViewRepresentable {
                 return
             }
             onResult(.success(code))
-        }
-
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            guard !didFinish else { return }
-            didFinish = true
-            onResult(.failure(error))
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
