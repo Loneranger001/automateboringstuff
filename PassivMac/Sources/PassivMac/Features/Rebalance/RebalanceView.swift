@@ -148,11 +148,16 @@ struct RebalanceView: View {
         excludedIds = []
 
         let allPositions = group.accounts.flatMap { $0.positions }
-        let currentPrices: [UUID: Double] = Dictionary(uniqueKeysWithValues:
+        // The same security can be held in multiple accounts (e.g. VEQT in TFSA and RRSP),
+        // which produces duplicate keys. `Dictionary(uniqueKeysWithValues:)` traps on
+        // duplicates, so collapse by taking the last price — it's the same security, so
+        // any occurrence's price is equivalent.
+        let currentPrices: [UUID: Double] = Dictionary(
             allPositions.compactMap { pos -> (UUID, Double)? in
                 guard let sec = pos.security else { return nil }
                 return (sec.id, sec.lastPrice)
-            }
+            },
+            uniquingKeysWith: { _, new in new }
         )
 
         // Assign each security to the account that holds it, or first account if not yet held
@@ -167,10 +172,16 @@ struct RebalanceView: View {
             }
         }
 
-        let holdings: [(securityId: UUID, currentValue: Double)] = allPositions.compactMap { pos in
-            guard let sec = pos.security else { return nil }
-            return (sec.id, pos.currentValue)
+        // Aggregate by securityId across accounts — RebalanceEngine looks up holdings
+        // via `.first(where:)`, so without aggregation a security held in multiple
+        // accounts would be under-reported (only the first account's value counted).
+        var holdingsBySecurity: [UUID: Double] = [:]
+        for pos in allPositions {
+            guard let sec = pos.security else { continue }
+            holdingsBySecurity[sec.id, default: 0] += pos.currentValue
         }
+        let holdings: [(securityId: UUID, currentValue: Double)] =
+            holdingsBySecurity.map { (securityId: $0.key, currentValue: $0.value) }
 
         let targetAllocations: [(securityId: UUID, symbol: String, targetPercent: Double)] =
             group.targetAllocations

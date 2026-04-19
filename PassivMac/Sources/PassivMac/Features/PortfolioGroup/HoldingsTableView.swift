@@ -14,11 +14,12 @@ struct HoldingsTableView: View {
     }
 
     private var targets: [UUID: Double] {
-        Dictionary(uniqueKeysWithValues:
+        Dictionary(
             group.targetAllocations.compactMap { t -> (UUID, Double)? in
                 guard let sec = t.security else { return nil }
                 return (sec.id, t.targetPercent)
-            }
+            },
+            uniquingKeysWith: { _, new in new }
         )
     }
 
