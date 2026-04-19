@@ -3,18 +3,30 @@ import SwiftUI
 struct PortfolioGroupCardView: View {
     let group: PortfolioGroup
 
+    /// USD→CAD rate — how many CAD equal 1 USD. Loaded from FXRateService;
+    /// falls back to the persisted "last good" rate from Bank of Canada, and
+    /// a hardcoded floor if even that's unavailable.
+    @State private var usdCadRate: Double = 1.36
+
     private var totalValue: Double {
-        group.accounts.reduce(0) { $0 + $1.totalMarketValue + $1.cashBalance }
+        PortfolioCalculator.totalValueInBase(group: group, usdCadRate: usdCadRate)
     }
 
     private var totalCash: Double {
-        group.accounts.reduce(0) { $0 + $1.cashBalance }
+        PortfolioCalculator.totalCashInBase(group: group, usdCadRate: usdCadRate)
     }
 
     private var holdings: [(securityId: UUID, currentValue: Double)] {
-        group.accounts.flatMap { $0.positions }.compactMap { pos in
-            guard let sec = pos.security else { return nil }
-            return (sec.id, pos.currentValue)
+        // Convert each position's native currency value to base currency so
+        // the accuracy ring compares like-with-like.
+        group.accounts.flatMap { acct in
+            acct.positions.compactMap { pos -> (UUID, Double)? in
+                guard let sec = pos.security else { return nil }
+                let rate = PortfolioCalculator.conversionRate(
+                    from: acct.currency, to: group.baseCurrency, usdCadRate: usdCadRate
+                )
+                return (sec.id, pos.currentValue * rate)
+            }
         }
     }
 
@@ -79,6 +91,11 @@ struct PortfolioGroupCardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(.separator, lineWidth: 0.5)
         )
+        .task {
+            // Fetch the latest USD→CAD rate once when the card appears.
+            // FXRateService caches for an hour and persists last-good to UserDefaults.
+            usdCadRate = await FXRateService.shared.rate(from: .usd, to: .cad)
+        }
     }
 }
 

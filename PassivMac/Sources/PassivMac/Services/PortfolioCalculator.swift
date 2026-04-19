@@ -4,6 +4,57 @@ import Foundation
 /// No I/O — fully unit-testable.
 enum PortfolioCalculator {
 
+    // MARK: - FX-aware aggregation
+
+    /// Per-account native value (positions + cash) converted to `baseCurrency`.
+    /// The group's accounts can be in different currencies (e.g. a CAD TFSA and
+    /// a USD non-registered account) — summing their raw values gives a wrong
+    /// total labeled with the base currency's symbol. Convert each account's
+    /// native value to the base currency first.
+    static func accountValueInBase(
+        _ account: Account,
+        baseCurrency: Currency,
+        usdCadRate: Double
+    ) -> (marketValue: Double, cash: Double) {
+        let raw = account.totalMarketValue
+        let cash = account.cashBalance
+        let rate = conversionRate(from: account.currency, to: baseCurrency, usdCadRate: usdCadRate)
+        return (raw * rate, cash * rate)
+    }
+
+    /// Group total (market value + cash) in base currency.
+    static func totalValueInBase(
+        group: PortfolioGroup,
+        usdCadRate: Double
+    ) -> Double {
+        group.accounts.reduce(0) { acc, account in
+            let v = accountValueInBase(account, baseCurrency: group.baseCurrency, usdCadRate: usdCadRate)
+            return acc + v.marketValue + v.cash
+        }
+    }
+
+    /// Group cash in base currency.
+    static func totalCashInBase(
+        group: PortfolioGroup,
+        usdCadRate: Double
+    ) -> Double {
+        group.accounts.reduce(0) { acc, account in
+            let v = accountValueInBase(account, baseCurrency: group.baseCurrency, usdCadRate: usdCadRate)
+            return acc + v.cash
+        }
+    }
+
+    /// Conversion factor for `1 unit of from` expressed in `to`, for the USD/CAD
+    /// pair. `usdCadRate` is how many CAD equal 1 USD.
+    static func conversionRate(from: Currency, to: Currency, usdCadRate: Double) -> Double {
+        if from == to { return 1.0 }
+        switch (from, to) {
+        case (.usd, .cad): return usdCadRate
+        case (.cad, .usd): return usdCadRate > 0 ? 1.0 / usdCadRate : 1.0
+        default: return 1.0
+        }
+    }
+
     // MARK: - Portfolio Accuracy
 
     /// Returns a value 0.0–1.0 representing how close the current holdings are to targets.

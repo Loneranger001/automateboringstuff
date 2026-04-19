@@ -17,6 +17,12 @@ actor QuestradeProvider: BrokerageProvider {
     /// so two sync loops can't both hit /oauth2/token simultaneously and corrupt state.
     private var inflightRefreshes: [UUID: Task<Void, Error>] = [:]
 
+    /// In-memory cache of the current access token per connection.
+    /// Avoids repeat `keychain.get()` calls — on ad-hoc-signed builds the macOS
+    /// Keychain prompts for the login password on every read because the ACL
+    /// can't trust an unstable signing identity. Cache is invalidated on refresh.
+    private var accessTokenCache: [UUID: String] = [:]
+
     // MARK: - Rate-limit-aware HTTP wrappers
 
     /// Throttles, calls the underlying HTTPClient, records 429s into the rate limiter.
@@ -95,17 +101,37 @@ actor QuestradeProvider: BrokerageProvider {
         )
         try await keychain.store(response.accessToken, for: .accessToken(connectionId: connectionId))
         try await keychain.store(response.refreshToken, for: .refreshToken(connectionId: connectionId))
+        // Update in-memory cache + apiServer so subsequent requests immediately use the new token.
+        accessTokenCache[connectionId] = response.accessToken
+        UserDefaults.standard.set(response.apiServer, forKey: "qs_apiServer_\(connectionId.uuidString)")
         // Caller is responsible for updating tokenExpiresAt on BrokerageConnection in SwiftData.
+    }
+
+    /// Run an API-call closure, and on `authExpired` refresh the token and retry once.
+    /// Keeps the fix for the "Authentication expired" error out of every individual
+    /// call site — symbol search, trade placement, etc.
+    private func withAuthRetry<T>(
+        connectionId: UUID,
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation()
+        } catch APIError.authExpired {
+            try await performTokenRefresh(connectionId: connectionId)
+            return try await operation()
+        }
     }
 
     // MARK: - Accounts
 
     func fetchAccounts(connectionId: UUID) async throws -> [RemoteAccount] {
-        let (token, apiServer) = try await credentials(connectionId: connectionId)
-        let response: QuestradeAccountsResponse = try await rlGet(
-            try QuestradeEndpoints.accounts(apiServer: apiServer),
-            headers: QuestradeEndpoints.authHeader(accessToken: token)
-        )
+        let response: QuestradeAccountsResponse = try await withAuthRetry(connectionId: connectionId) {
+            let (token, apiServer) = try await credentials(connectionId: connectionId)
+            return try await rlGet(
+                try QuestradeEndpoints.accounts(apiServer: apiServer),
+                headers: QuestradeEndpoints.authHeader(accessToken: token)
+            )
+        }
         return response.accounts.map { account in
             RemoteAccount(
                 brokerageAccountId: account.number,
@@ -119,11 +145,13 @@ actor QuestradeProvider: BrokerageProvider {
     // MARK: - Positions
 
     func fetchPositions(accountId: String, connectionId: UUID) async throws -> [RemotePosition] {
-        let (token, apiServer) = try await credentials(connectionId: connectionId)
-        let response: QuestradePositionsResponse = try await rlGet(
-            try QuestradeEndpoints.positions(apiServer: apiServer, accountNumber: accountId),
-            headers: QuestradeEndpoints.authHeader(accessToken: token)
-        )
+        let response: QuestradePositionsResponse = try await withAuthRetry(connectionId: connectionId) {
+            let (token, apiServer) = try await credentials(connectionId: connectionId)
+            return try await rlGet(
+                try QuestradeEndpoints.positions(apiServer: apiServer, accountNumber: accountId),
+                headers: QuestradeEndpoints.authHeader(accessToken: token)
+            )
+        }
         return response.positions.map { p in
             RemotePosition(
                 symbol: p.symbol,
@@ -141,11 +169,13 @@ actor QuestradeProvider: BrokerageProvider {
     // MARK: - Balances
 
     func fetchBalances(accountId: String, connectionId: UUID) async throws -> [RemoteBalance] {
-        let (token, apiServer) = try await credentials(connectionId: connectionId)
-        let response: QuestradeBalancesResponse = try await rlGet(
-            try QuestradeEndpoints.balances(apiServer: apiServer, accountNumber: accountId),
-            headers: QuestradeEndpoints.authHeader(accessToken: token)
-        )
+        let response: QuestradeBalancesResponse = try await withAuthRetry(connectionId: connectionId) {
+            let (token, apiServer) = try await credentials(connectionId: connectionId)
+            return try await rlGet(
+                try QuestradeEndpoints.balances(apiServer: apiServer, accountNumber: accountId),
+                headers: QuestradeEndpoints.authHeader(accessToken: token)
+            )
+        }
         return response.perCurrencyBalances.map { b in
             RemoteBalance(
                 currency: Currency(rawValue: b.currency) ?? .cad,
@@ -158,16 +188,18 @@ actor QuestradeProvider: BrokerageProvider {
     // MARK: - Activities
 
     func fetchActivities(accountId: String, from: Date, connectionId: UUID) async throws -> [RemoteActivity] {
-        let (token, apiServer) = try await credentials(connectionId: connectionId)
-        let response: QuestradeActivitiesResponse = try await rlGet(
-            try QuestradeEndpoints.activities(
-                apiServer: apiServer,
-                accountNumber: accountId,
-                startTime: from,
-                endTime: Date()
-            ),
-            headers: QuestradeEndpoints.authHeader(accessToken: token)
-        )
+        let response: QuestradeActivitiesResponse = try await withAuthRetry(connectionId: connectionId) {
+            let (token, apiServer) = try await credentials(connectionId: connectionId)
+            return try await rlGet(
+                try QuestradeEndpoints.activities(
+                    apiServer: apiServer,
+                    accountNumber: accountId,
+                    startTime: from,
+                    endTime: Date()
+                ),
+                headers: QuestradeEndpoints.authHeader(accessToken: token)
+            )
+        }
         let parser = ISO8601DateFormatter()
         return response.activities.compactMap { a in
             guard let date = parser.date(from: a.settlementDate) else { return nil }
@@ -184,8 +216,6 @@ actor QuestradeProvider: BrokerageProvider {
     // MARK: - Orders
 
     func placeOrder(_ order: OrderRequest, connectionId: UUID) async throws -> RemoteOrder {
-        let (token, apiServer) = try await credentials(connectionId: connectionId)
-
         // Questrade requires symbolId — look it up first
         let symbolResult = try await searchSymbols(query: order.symbol, connectionId: connectionId)
         guard let match = symbolResult.first(where: { $0.symbol == order.symbol }) else {
@@ -211,11 +241,14 @@ actor QuestradeProvider: BrokerageProvider {
             secondaryRoute: "AUTO"
         )
 
-        let response: QuestradeOrderResponse = try await rlPost(
-            try QuestradeEndpoints.orders(apiServer: apiServer, accountNumber: order.accountId),
-            body: body,
-            headers: QuestradeEndpoints.authHeader(accessToken: token)
-        )
+        let response: QuestradeOrderResponse = try await withAuthRetry(connectionId: connectionId) {
+            let (token, apiServer) = try await credentials(connectionId: connectionId)
+            return try await rlPost(
+                try QuestradeEndpoints.orders(apiServer: apiServer, accountNumber: order.accountId),
+                body: body,
+                headers: QuestradeEndpoints.authHeader(accessToken: token)
+            )
+        }
         guard let qtOrder = response.orders.first else {
             throw APIError.brokerageError("No order returned from Questrade")
         }
@@ -228,24 +261,28 @@ actor QuestradeProvider: BrokerageProvider {
     }
 
     func cancelOrder(brokerageOrderId: String, accountId: String, connectionId: UUID) async throws {
-        let (token, apiServer) = try await credentials(connectionId: connectionId)
         guard let orderId = Int(brokerageOrderId) else {
             throw APIError.brokerageError("Invalid order ID: \(brokerageOrderId)")
         }
-        try await rlDelete(
-            try QuestradeEndpoints.order(apiServer: apiServer, accountNumber: accountId, orderId: orderId),
-            headers: QuestradeEndpoints.authHeader(accessToken: token)
-        )
+        try await withAuthRetry(connectionId: connectionId) {
+            let (token, apiServer) = try await credentials(connectionId: connectionId)
+            try await rlDelete(
+                try QuestradeEndpoints.order(apiServer: apiServer, accountNumber: accountId, orderId: orderId),
+                headers: QuestradeEndpoints.authHeader(accessToken: token)
+            )
+        }
     }
 
     // MARK: - Symbol Search
 
     func searchSymbols(query: String, connectionId: UUID) async throws -> [SymbolSearchResult] {
-        let (token, apiServer) = try await credentials(connectionId: connectionId)
-        let response: QuestradeSymbolSearchResponse = try await rlGet(
-            try QuestradeEndpoints.symbolSearch(apiServer: apiServer, prefix: query),
-            headers: QuestradeEndpoints.authHeader(accessToken: token)
-        )
+        let response: QuestradeSymbolSearchResponse = try await withAuthRetry(connectionId: connectionId) {
+            let (token, apiServer) = try await credentials(connectionId: connectionId)
+            return try await rlGet(
+                try QuestradeEndpoints.symbolSearch(apiServer: apiServer, prefix: query),
+                headers: QuestradeEndpoints.authHeader(accessToken: token)
+            )
+        }
         return response.symbols.filter { $0.isTradable }.map { s in
             SymbolSearchResult(
                 id: String(s.symbolId),
@@ -261,7 +298,13 @@ actor QuestradeProvider: BrokerageProvider {
     // MARK: - Private helpers
 
     private func credentials(connectionId: UUID) async throws -> (accessToken: String, apiServer: String) {
-        let token = try await keychain.retrieve(for: .accessToken(connectionId: connectionId))
+        let token: String
+        if let cached = accessTokenCache[connectionId] {
+            token = cached
+        } else {
+            token = try await keychain.retrieve(for: .accessToken(connectionId: connectionId))
+            accessTokenCache[connectionId] = token
+        }
         // apiServer is stored in SwiftData BrokerageConnection.apiServer — caller must pass it.
         // For now, we read it from UserDefaults keyed by connectionId as a lightweight cache.
         let key = "qs_apiServer_\(connectionId.uuidString)"
